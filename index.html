@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <title>Sample Map</title>
+  <meta charset="UTF-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link
+    rel="stylesheet"
+    href="https://cdn.jsdelivr.net/npm/bootstrap@4.0.0/dist/css/bootstrap.min.css"
+    integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm"
+    crossorigin="anonymous"
+  />
+
+  <script
+    type="text/javascript"
+    src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"
+  ></script>
+  <script type="text/javascript">
+    (function () {
+      emailjs.init("O6DdTd4lpKSNFt17u");
+    })();
+  </script>
+  <style>
+    
+    #map {
+      height: 100%;
+      background-color: grey;
+    }
+
+    html,
+    body {
+      height: 100%;
+      margin: 0;
+      padding: 0;
+    }
+
+   
+    #panel {
+      height: 100%;
+      width: null;
+      background-color: white;
+      position: fixed;
+      z-index: 1;
+      overflow-x: hidden;
+      transition: all .2s ease-out;
+    }
+
+    .open {
+      width: 250px;
+    }
+
+    .hero {
+      width: 100%;
+      height: auto;
+      max-height: 166px;
+      display: block;
+    }
+
+    .place,
+    p {
+      font-family: 'open sans', arial, sans-serif;
+      padding-left: 18px;
+      padding-right: 18px;
+    }
+
+    .details {
+      color: darkslategrey;
+    }
+
+    a {
+      text-decoration: none;
+      color: cadetblue;
+    }
+  </style>
+</head>
+
+<body>
+  
+  <div id="panel"></div>
+
+  <div id="map"></div>
+
+  <script>
+    let pos;
+    let map;
+    let bounds;
+    let infoWindow;
+    let currentInfoWindow;
+    let service;
+    let infoPane;
+    let searchedPlaces = [];
+
+    const hospitalEmails = [
+  { name: "Saravana Heart Hospital", email: "hospitalA@example.com" },
+  { name: "Hospital B", email: "hospitalB@example.com" },
+  // Add more hospitals and their email addresses as needed
+  { name: "Srushti Fertility Centre", email: "hospitalC@example.com" },
+  { name: "V", email: "hospitalD@example.com" },
+  { name: "RJR Herbal Hospitals", email: "hospitalE@example.com" },
+  { name: "Sri Sugam Physiotherapy Institute Private Limited", email: "hospitalF@example.com" },
+  { name: "CNR Herbs", email: "hospitalG@example.com" },
+  { name: "Priya Hospitals Orthopaedic Hospital", email: "hospitalH@example.com" },
+  { name: "Centre for Brain and Spine Care", email: "hospitalI@example.com" },
+  { name: "G.A.T. Patient Care", email: "hospitalJ@example.com" },
+  { name: "Harley Clinic [Dr. Shobana, (Dermatologist)]", email: "hospitalK@example.com" },
+  { name: "Halina Health Care Center", email: "hospitalL@example.com" },
+  { name: "Psychiatry Clinic", email: "hospitalM@example.com" },
+  { name: "MD Neuro Clinic", email: "hospitalN@example.com" },
+  { name: "Dr. Wahaab's Fertility Acupuncture", email: "hospitalO@example.com" },
+  { name: "Lotus Eye Care Hospital", email: "hospitalP@example.com" },
+  { name: "Dr. K.P Thirumaran Speciality Clinic", email: "hospitalQ@example.com" },
+  { name: "Acuboutique", email: "hospitalR@example.com" },
+  { name: "Halina Cupping Therapy Clinic", email: "hospitalS@example.com" },
+  { name: "Sarvaa Healthcare and Aesthetics Wellness", email: "hospitalT@example.com" },
+  { name: "Dr.Vijayalakshmi Dermatologist", email: "hospitalU@example.com" }
+];
+
+  // here where the code starts
+    function initMap() {
+  
+      bounds = new google.maps.LatLngBounds();
+      infoWindow = new google.maps.InfoWindow;
+      currentInfoWindow = infoWindow;
+      infoPane = document.getElementById('panel');
+  
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(position => {
+          pos = {
+            lat: position.coords.latitude,
+            lng: position.coords.longitude
+          };
+          map = new google.maps.Map(document.getElementById('map'), {
+            center: pos,
+            zoom: 15
+          });
+          bounds.extend(pos);
+  
+          infoWindow.setPosition(pos);
+          infoWindow.setContent('Location found.');
+          infoWindow.open(map);
+          map.setCenter(pos);
+  
+          // Call Places Nearby Search on user's location
+          getNearbyPlaces(pos);
+        }, () => {
+          handleLocationError(true, infoWindow);
+        });
+      } else {
+        handleLocationError(false, infoWindow);
+      }
+    }
+  
+    function handleLocationError(browserHasGeolocation, infoWindow) {
+      pos = { lat: -33.856, lng: 151.215 };
+      map = new google.maps.Map(document.getElementById('map'), {
+        center: pos,
+        zoom: 15
+      });
+  
+      infoWindow.setPosition(pos);
+      infoWindow.setContent(browserHasGeolocation ?
+        'Geolocation permissions denied. Using default location.' :
+        'Error: Your browser doesn\'t support geolocation.');
+      infoWindow.open(map);
+      currentInfoWindow = infoWindow;
+  
+      // Call Places Nearby Search on the default location
+      getNearbyPlaces(pos);
+    }
+  
+    function getNearbyPlaces(position) {
+      let request = {
+        location: position,
+        radius: 500, // Change radius to 500 meters-with 500 meter radius
+        type: "hospital" // Change type to "store" here we mentioned hospital hence it fetches the hospital 
+      };
+  
+      service = new google.maps.places.PlacesService(map);
+      service.nearbySearch(request, nearbyCallback);
+    }
+  
+    function nearbyCallback(results, status) {
+      if (status == google.maps.places.PlacesServiceStatus.OK) {
+        createMarkers(results);
+        console.log(results);
+        storingplaces(results);//the result hold the searched place data and sending it to storing place function to sstore it in array
+        logSearchedPlaces(); 
+      }
+    }
+
+
+    function getEmailForHospital(hospitalName) {
+  // Search for the hospital name in the hospitalEmails array
+  const hospital = hospitalEmails.find(hospital => hospital.name === hospitalName);
+  // Return the email address if found, or null if not found
+  return hospital ? hospital.email : null;
+}
+  
+function createMarkers(places) {
+    places.forEach(place => {
+        let marker = new google.maps.Marker({
+            position: place.geometry.location,
+            map: map,
+            title: place.name
+        });
+
+        google.maps.event.addListener(marker, 'click', () => {
+            let request = {
+                placeId: place.place_id,
+                fields: ['name', 'formatted_address', 'geometry', 'rating', 'website', 'photos']
+            };
+
+            service.getDetails(request, (placeResult, status) => {
+                if (status == google.maps.places.PlacesServiceStatus.OK) {
+                    // Store the clicked hospital information in a variable
+                    let clickedHospital = {
+                        name: placeResult.name,
+                        rating: placeResult.rating || 'None',
+                        address: placeResult.formatted_address || 'Unknown',
+                        website: placeResult.website || 'Not available'
+                    };
+
+                    const hospitalEmail = getEmailForHospital(clickedHospital.name);
+
+                    // Prompt user for details
+                    let userName = prompt("Enter your name:");
+                    let userAge = prompt("Enter your age:");
+                    let userAddress = prompt("Enter your address:");
+                    let userPhoneNumber = prompt("Enter your phone number:");
+
+                    // Use the email address as needed
+                    console.log('Email address for the clicked hospital:', hospitalEmail);
+
+                    // Prepare parameters for email.js
+                    let emailParams = {
+                        name: userName,
+                        age: userAge,
+                        address: userAddress,
+                        phone_number: userPhoneNumber,
+                        email: hospitalEmail
+                    };
+
+                    // Use emailParams to send email using email.js
+                    // 
+                    console.log(emailParams);
+
+
+                   
+                    const serviceID = "service_qenvgmm";
+        const templateID = "template_6e4n4z6";
+
+        emailjs.send(serviceID, templateID, emailParams)
+            .then(res => {
+                console.log(res);
+                alert("Alert Message is sent to your desired Hospital.They will reach you soon :)");
+            })
+            .catch(err => console.log(err));
+
+                    
+                    console.log(clickedHospital);
+                    
+
+                } else {
+                    console.error('Error fetching details:', status);
+                }
+            });
+        });
+
+        bounds.extend(place.geometry.location);
+    });
+    map.fitBounds(bounds);
+}
+
+  
+    function logPlaceDetails(placeResult, status) {
+      if (status == google.maps.places.PlacesServiceStatus.OK) {
+        console.log('Place Name:', placeResult.name);
+        console.log('Rating:', placeResult.rating || 'None');
+        console.log('Address:', placeResult.formatted_address || 'Unknown');
+        console.log('Website:', placeResult.website || 'Not available');
+  
+        // Store the place details
+        
+    }
+  }
+    function storingplaces(placeResult) {
+  placeResult.forEach(place => {
+    searchedPlaces.push({
+      name: place.name,
+      rating: place.rating || 'None',
+      address: place.vicinity || 'Unknown',
+      website: place.website || 'Not available'
+    });
+  });
+}
+  
+    function showPanel(placeResult) {
+      if (infoPane.classList.contains("open")) {
+        infoPane.classList.remove("open");
+      }
+  
+      while (infoPane.lastChild) {
+        infoPane.removeChild(infoPane.lastChild);
+      }
+  
+      if (placeResult.photos) {
+        let firstPhoto = placeResult.photos[0];
+        let photo = document.createElement('img');
+        photo.classList.add('hero');
+        photo.src = firstPhoto.getUrl();
+        infoPane.appendChild(photo);
+      }
+  
+      let name = document.createElement('h1');
+      name.classList.add('place');
+      name.textContent = placeResult.name;
+      infoPane.appendChild(name);
+      if (placeResult.rating) {
+        let rating = document.createElement('p');
+        rating.classList.add('details');
+        rating.textContent = `Rating: ${placeResult.rating} \u272e`;
+        infoPane.appendChild(rating);
+      }
+      let address = document.createElement('p');
+      address.classList.add('details');
+      address.textContent = placeResult.formatted_address;
+      infoPane.appendChild(address);
+      if (placeResult.website) {
+        let websitePara = document.createElement('p');
+        let websiteLink = document.createElement('a');
+        let websiteUrl = document.createTextNode(placeResult.website);
+        websiteLink.appendChild(websiteUrl);
+        websiteLink.title = placeResult.website;
+        websiteLink.href = placeResult.website;
+        websitePara.appendChild(websiteLink);
+        infoPane.appendChild(websitePara);
+      }
+  
+      infoPane.classList.add("open");
+    }
+  
+    function logSearchedPlaces() {
+      console.log("Searched Places:");
+      console.log(JSON.stringify(searchedPlaces, null, 2));
+    }
+  
+    
+  
+    
+  </script>
+
+
+  <script async defer src="https://maps.googleapis.com/maps/api/js?key=AIzaSyB41DRUbKWJHPxaFjMAwdrzWzbVKartNGg&libraries=places&callback=initMap">
+  </script>
+</body>
+<!-- here where we mention the API key and initial function -->
+
+</html>
+
+
